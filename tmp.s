@@ -1,3 +1,4 @@
+#now char is 42
 .intel_syntax noprefix
 .global main
 main:
