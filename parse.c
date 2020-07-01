@@ -14,9 +14,9 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
 }
 
 static Node *new_unary(NodeKind kind, Node *expr) {
-    Node *node = new_node(kind);
-    node->lhs = expr;
-    return node;
+  Node *node = new_node(kind);
+  node->lhs = expr;
+  return node;
 }
 
 static Node *new_num(long val) {
@@ -25,8 +25,15 @@ static Node *new_num(long val) {
   return node;
 }
 
+static Node *new_var_node(char name) {
+  Node *node = new_node(ND_VAR);
+  node->name = name;
+  return node;
+}
+
 static Node *stmt(void);
 static Node *expr(void);
+static Node *assign(void);
 static Node *equality(void);
 static Node *relational(void);
 static Node *add(void);
@@ -35,36 +42,43 @@ static Node *unary(void);
 static Node *primary(void);
 
 // program = stmt*
-// 1 + 2; 2; 3; ----> stmt; stmt; stmt;
 Node *program(void) {
-    Node head = {};
-    Node *cur = &head;
+  Node head = {};
+  Node *cur = &head;
 
-    while(!at_eof()) {
-        cur->next = stmt();
-        cur = cur->next;
-    }
-
-    return head.next;
+  while (!at_eof()) {
+    cur->next = stmt();
+    cur = cur->next;
+  }
+  return head.next;
 }
 
-// stmt = expr ";" | "return" expr ";"
+// stmt = "return" expr ";"
+//      | expr ";"
 static Node *stmt(void) {
-    if (consume("return")) {
-        Node *node = new_unary(ND_RETURN, expr());
-        expect(";");
-        return node;
-    }
-    Node *node = expr();
+  if (consume("return")) {
+    Node *node = new_unary(ND_RETURN, expr());
     expect(";");
     return node;
+  }
+
+  Node *node = new_unary(ND_EXPR_STMT, expr());
+  expect(";");
+  return node;
 }
 
-// expr = equality
+// expr = assign
 static Node *expr(void) {
-    return equality();
+  return assign();
 }
 
+// assign = equality ("=" assign)?
+static Node *assign(void) {
+  Node *node = equality();
+  if (consume("="))
+    node = new_binary(ND_ASSIGN, node, assign());
+  return node;
+}
 
 // equality = relational ("==" relational | "!=" relational)*
 static Node *equality(void) {
@@ -136,13 +150,17 @@ static Node *unary(void) {
   return primary();
 }
 
-// primary = "(" expr ")" | num
+// primary = "(" expr ")" | ident | num
 static Node *primary(void) {
   if (consume("(")) {
     Node *node = expr();
     expect(")");
     return node;
   }
+
+  Token *tok = consume_ident();
+  if (tok)
+    return new_var_node(*tok->str);
 
   return new_num(expect_number());
 }
