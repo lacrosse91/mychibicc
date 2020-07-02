@@ -4,11 +4,8 @@ main:
   push rbp
   mov rbp, rsp
   sub rsp, 0
-  push 1
-  add rsp, 8
-  push 2
-  add rsp, 8
-  push 3
+  call ret5
+  push rax
   pop rax
   jmp .L.return
 .L.return:
