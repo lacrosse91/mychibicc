@@ -237,8 +237,22 @@ static Node *unary(void) {
   return primary();
 }
 
-// primary = "(" expr ")" | ident args? | num
-// args = "(" ")"
+// func-args = "(" (assign ("," assign)*)? ")"
+static Node *func_args(void) {
+  if (consume(")"))
+    return NULL;
+
+  Node *head = assign();
+  Node *cur = head;
+  while (consume(",")) {
+    cur->next = assign();
+    cur = cur->next;
+  }
+  expect(")");
+  return head;
+}
+
+// primary = "(" expr ")" | ident func-args? | num
 static Node *primary(void) {
   if (consume("(")) {
     Node *node = expr();
@@ -247,18 +261,16 @@ static Node *primary(void) {
   }
 
   Token *tok = consume_ident();
-
-  // Function call. check if this ident is func name or not before create a token.
-  if (consume("(")) {
-      expect(")");
+  if (tok) {
+    // Function call
+    if (consume("(")) {
       Node *node = new_node(ND_FUNCALL);
       node->funcname = strndup(tok->str, tok->len);
+      node->args = func_args();
       return node;
-  }
+    }
 
-
-  // Variable
-  if (tok) {
+    // Variable
     Var *var = find_var(tok);
     if (!var)
       var = new_lvar(strndup(tok->str, tok->len));
