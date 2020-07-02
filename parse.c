@@ -1,18 +1,17 @@
 #include "chibi.h"
 
-// All local var innstances created during parsing are
-// accumulated to this list
+// All local variable instances created during parsing are
+// accumulated to this list.
 Var *locals;
 
-// Find a local var by name
+// Find a local variable by name.
 static Var *find_var(Token *tok) {
-    for (Var *var = locals; var; var = var->next) {
-        if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len)) {
-            return var;
-        }
-    }
-    return NULL;
+  for (Var *var = locals; var; var = var->next)
+    if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
+      return var;
+  return NULL;
 }
+
 static Node *new_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
@@ -45,12 +44,13 @@ static Node *new_var_node(Var *var) {
 }
 
 static Var *new_lvar(char *name) {
-    Var *var = calloc(1, sizeof(Var));
-    var->next = locals;
-    var->name = name;
-    locals = var;
-    return var;
+  Var *var = calloc(1, sizeof(Var));
+  var->next = locals;
+  var->name = name;
+  locals = var;
+  return var;
 }
+
 static Node *stmt(void);
 static Node *expr(void);
 static Node *assign(void);
@@ -64,6 +64,7 @@ static Node *primary(void);
 // program = stmt*
 Function *program(void) {
   locals = NULL;
+
   Node head = {};
   Node *cur = &head;
 
@@ -79,13 +80,14 @@ Function *program(void) {
 }
 
 static Node *read_expr_stmt(void) {
-    return new_unary(ND_EXPR_STMT, expr());
+  return new_unary(ND_EXPR_STMT, expr());
 }
 
 // stmt = "return" expr ";"
-//      | "if" "(" expr ")" stmt ( "else" stmt)?
+//      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//      | "{" stmt* "}"
 //      | expr ";"
 static Node *stmt(void) {
   if (consume("return")) {
@@ -94,25 +96,24 @@ static Node *stmt(void) {
     return node;
   }
 
-  if (consume("while")) {
-      Node *node = new_node(ND_WHILE);
-      expect("(");
-      node->cond = expr();
-      expect(")");
-      node->then = stmt();
-      return node;
+  if (consume("if")) {
+    Node *node = new_node(ND_IF);
+    expect("(");
+    node->cond = expr();
+    expect(")");
+    node->then = stmt();
+    if (consume("else"))
+      node->els = stmt();
+    return node;
   }
 
-  if (consume("if")) {
-      Node *node = new_node(ND_IF);
-      expect("(");
-      node->cond = expr();
-      expect(")");
-      node->then = stmt();
-      if (consume("else")) {
-          node->els = stmt();
-      }
-      return node;
+  if (consume("while")) {
+    Node *node = new_node(ND_WHILE);
+    expect("(");
+    node->cond = expr();
+    expect(")");
+    node->then = stmt();
+    return node;
   }
 
   if (consume("for")) {
@@ -131,6 +132,20 @@ static Node *stmt(void) {
       expect(")");
     }
     node->then = stmt();
+    return node;
+  }
+
+  if (consume("{")) {
+    Node head = {};
+    Node *cur = &head;
+
+    while (!consume("}")) {
+      cur->next = stmt();
+      cur = cur->next;
+    }
+
+    Node *node = new_node(ND_BLOCK);
+    node->body = head.next;
     return node;
   }
 
@@ -232,10 +247,9 @@ static Node *primary(void) {
 
   Token *tok = consume_ident();
   if (tok) {
-      Var *var = find_var(tok);
-      if (!var) {
-          var = new_lvar(strndup(tok->str, tok->len));
-      }
+    Var *var = find_var(tok);
+    if (!var)
+      var = new_lvar(strndup(tok->str, tok->len));
     return new_var_node(var);
   }
 
