@@ -64,6 +64,14 @@ bool at_eof(void) {
   return token->kind == TK_EOF;
 }
 
+char *expect_ident(void) {
+    if (token->kind != TK_IDENT)
+        error_at(token->str, "expected an identifer");
+    char *s = strndup(token->str, token->len);
+    token = token->next;
+    return s;
+}
+
 // Create a new token and add it as the next token of `cur`.
 static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
   Token *tok = calloc(1, sizeof(Token));
