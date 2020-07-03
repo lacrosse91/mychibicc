@@ -1,11 +1,12 @@
-
 #include "chibi.h"
+
+static char *argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
 static int labelseq = 1;
 static char *funcname;
-static char *argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
 static void gen(Node *node);
+
 // Pushes the given node's address to the stack.
 static void gen_addr(Node *node) {
   switch (node->kind) {
@@ -162,8 +163,22 @@ static void gen(Node *node) {
   case ND_ADD:
     printf("  add rax, rdi\n");
     break;
+  case ND_PTR_ADD:
+    printf("  imul rdi, 8\n");
+    printf("  add rax, rdi\n");
+    break;
   case ND_SUB:
     printf("  sub rax, rdi\n");
+    break;
+  case ND_PTR_SUB:
+    printf("  imul rdi, 8\n");
+    printf("  sub rax, rdi\n");
+    break;
+  case ND_PTR_DIFF:
+    printf("  sub rax, rdi\n");
+    printf("  cqo\n");
+    printf("  mov rdi, 8\n");
+    printf("  idiv rdi\n");
     break;
   case ND_MUL:
     printf("  imul rax, rdi\n");
@@ -201,31 +216,30 @@ void codegen(Function *prog) {
   printf(".intel_syntax noprefix\n");
 
   for (Function *fn = prog; fn; fn = fn->next) {
-      printf(".global %s\n", fn->name);
-      printf("%s:\n", fn->name);
-      funcname = fn->name;
+    printf(".global %s\n", fn->name);
+    printf("%s:\n", fn->name);
+    funcname = fn->name;
 
-      // Prologue
-      printf("  push rbp\n");
-      printf("  mov rbp, rsp\n");
-      printf("  sub rsp, %d\n", fn->stack_size);
+    // Prologue
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  sub rsp, %d\n", fn->stack_size);
 
-      // Push arguments to the stack
-      int i = 0;
-      for (VarList *vl = fn->params; vl; vl = vl->next) {
-          Var *var = vl->var;
-          printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
-      }
+    // Push arguments to the stack
+    int i = 0;
+    for (VarList *vl = fn->params; vl; vl = vl->next) {
+      Var *var = vl->var;
+      printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
+    }
 
-      // Emit code
-      for (Node *node = fn->node; node; node = node->next)
-        gen(node);
+    // Emit code
+    for (Node *node = fn->node; node; node = node->next)
+      gen(node);
 
-      // Epilogue
-      printf(".L.return.%s:\n", funcname);
-      printf("  mov rsp, rbp\n");
-      printf("  pop rbp\n");
-      printf("  ret\n");
-
+    // Epilogue
+    printf(".L.return.%s:\n", funcname);
+    printf("  mov rsp, rbp\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
   }
 }

@@ -3,8 +3,8 @@
 main:
   push rbp
   mov rbp, rsp
-  sub rsp, 16
-  lea rax, [rbp-16]
+  sub rsp, 8
+  lea rax, [rbp-8]
   push rax
   push 3
   pop rdi
@@ -14,29 +14,20 @@ main:
   add rsp, 8
   lea rax, [rbp-8]
   push rax
-  push 5
+  push 2
   pop rdi
   pop rax
-  mov [rax], rdi
-  push rdi
-  add rsp, 8
+  imul rdi, 8
+  add rax, rdi
+  push rax
   lea rax, [rbp-8]
   push rax
-  push 8
   pop rdi
   pop rax
   sub rax, rdi
-  push rax
-  push 7
-  pop rdi
-  pop rax
-  mov [rax], rdi
-  push rdi
-  add rsp, 8
-  lea rax, [rbp-16]
-  push rax
-  pop rax
-  mov rax, [rax]
+  cqo
+  mov rdi, 8
+  idiv rdi
   push rax
   pop rax
   jmp .L.return.main
