@@ -33,6 +33,7 @@ void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
 Token *consume(char *op);
+Token *peek(char *s);
 Token *consume_ident(void);
 void expect(char *op);
 long expect_number(void);
@@ -51,6 +52,7 @@ extern Token *token;
 typedef struct Var Var;
 struct Var {
     char *name; //var name
+    Type *ty; // type
     int offset; // offset from RBP
 };
 
@@ -85,6 +87,7 @@ typedef enum {
   ND_FUNCALL, // Function call
   ND_EXPR_STMT, // Expression statement
   ND_NUM, // Integer
+  ND_NULL, // Empty statement
 } NodeKind;
 
 // AST node type
@@ -139,9 +142,13 @@ struct Type {
     Type *base;
 };
 
-bool is_integer(Type *ty);
-void add_type(Node *node);
 
+extern Type *int_type;
+
+
+bool is_integer(Type *ty);
+Type *pointer_to(Type *base);
+void add_type(Node *node);
 //
 // codegen.c
 //
