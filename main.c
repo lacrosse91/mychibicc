@@ -19,7 +19,8 @@ struct Token {
   int len;        // Token length
 };
 
-
+// Input string
+static char *current_input;
 
 // Reports an error and exit.
 static void error(char *fmt, ...) {
@@ -30,6 +31,30 @@ static void error(char *fmt, ...) {
   exit(1);
 }
 
+// Reports an error location and exit.
+static void verror_at(char *loc, char *fmt, va_list ap) {
+  int pos = loc - current_input;
+  fprintf(stderr, "%s\n", current_input);
+  fprintf(stderr, "%*s", pos, ""); // print pos spaces.
+  fprintf(stderr, "^ ");
+  vfprintf(stderr, fmt, ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
+static void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(loc, fmt, ap);
+}
+
+static void error_tok(Token *tok, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(tok->loc, fmt, ap);
+}
+
+
 // Consumes the current token if it matches `s`.
 static bool equal(Token *tok, char *s) {
   return strlen(s) == tok->len &&
@@ -39,14 +64,14 @@ static bool equal(Token *tok, char *s) {
 // Ensure that the current token is TK_NUM.
 static long get_number(Token *tok) {
   if (tok->kind != TK_NUM)
-    error("expected a number");
+    error_tok(tok, "expected a number");
   return tok->val;
 }
 
 // Ensure that the current token is `s`.
 static Token *skip(Token *tok, char *s) {
   if (!equal(tok, s))
-    error("expected '%s'", s);
+    error_tok(tok, "expected '%s'", s);
   return tok->next;
 }
 
@@ -61,7 +86,8 @@ static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
 }
 
 // Tokenize `p` and returns new tokens.
-static Token *tokenize(char *p) {
+static Token *tokenize(void) {
+    char *p = current_input;
     Token head = {};
     Token *cur = &head;
     head.next = NULL;
@@ -89,7 +115,7 @@ static Token *tokenize(char *p) {
             continue;
         }
 
-        error("invalid token");
+        error_at(p, "invalid token");
     }
 
     cur = new_token(TK_EOF, cur, p, 0);
@@ -104,7 +130,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  Token *tok = tokenize(argv[1]);
+  current_input = argv[1];
+  Token *tok = tokenize();
 
   printf(".globl main\n");
   printf("main:\n");
