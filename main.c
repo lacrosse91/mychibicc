@@ -1,29 +1,33 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 typedef enum {
   TK_RESERVED, // Keywords or punctuators
-  TK_NUM,      // Numeric literals
+  TK_NUM,      // Integer literals
   TK_EOF,      // End-of-file markers
 } TokenKind;
 
+// Token type
 typedef struct Token Token;
 struct Token {
   TokenKind kind; // Token kind
   Token *next;    // Next token
   long val;       // If kind is TK_NUM, its value
-  char *loc;      // Token location
-  int len;        // Token length
+  char *str;      // Token string
 };
 
-// Input string
-static char *current_input;
+// Input program
+char *user_input;
+
+// Current token
+Token *token;
 
 // Reports an error and exit.
-static void error(char *fmt, ...) {
+void error(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
@@ -32,9 +36,12 @@ static void error(char *fmt, ...) {
 }
 
 // Reports an error location and exit.
-static void verror_at(char *loc, char *fmt, va_list ap) {
-  int pos = loc - current_input;
-  fprintf(stderr, "%s\n", current_input);
+void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+
+  int pos = loc - user_input;
+  fprintf(stderr, "%s\n", user_input);
   fprintf(stderr, "%*s", pos, ""); // print pos spaces.
   fprintf(stderr, "^ ");
   vfprintf(stderr, fmt, ap);
@@ -42,114 +49,99 @@ static void verror_at(char *loc, char *fmt, va_list ap) {
   exit(1);
 }
 
-static void error_at(char *loc, char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  verror_at(loc, fmt, ap);
+// Consumes the current token if it matches `op`.
+bool consume(char op) {
+  if (token->kind != TK_RESERVED || token->str[0] != op)
+    return false;
+  token = token->next;
+  return true;
 }
 
-static void error_tok(Token *tok, char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  verror_at(tok->loc, fmt, ap);
-}
-
-
-// Consumes the current token if it matches `s`.
-static bool equal(Token *tok, char *s) {
-  return strlen(s) == tok->len &&
-         !strncmp(tok->loc, s, tok->len);
+// Ensure that the current token is `op`.
+void expect(char op) {
+  if (token->kind != TK_RESERVED || token->str[0] != op)
+    error_at(token->str, "expected '%c'", op);
+  token = token->next;
 }
 
 // Ensure that the current token is TK_NUM.
-static long get_number(Token *tok) {
-  if (tok->kind != TK_NUM)
-    error_tok(tok, "expected a number");
-  return tok->val;
+long expect_number(void) {
+  if (token->kind != TK_NUM)
+    error_at(token->str, "expected a number");
+  long val = token->val;
+  token = token->next;
+  return val;
 }
 
-// Ensure that the current token is `s`.
-static Token *skip(Token *tok, char *s) {
-  if (!equal(tok, s))
-    error_tok(tok, "expected '%s'", s);
-  return tok->next;
+bool at_eof(void) {
+  return token->kind == TK_EOF;
 }
 
 // Create a new token and add it as the next token of `cur`.
-static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
+Token *new_token(TokenKind kind, Token *cur, char *str) {
   Token *tok = calloc(1, sizeof(Token));
   tok->kind = kind;
-  tok->loc = str;
-  tok->len = len;
+  tok->str = str;
   cur->next = tok;
   return tok;
 }
 
-// Tokenize `p` and returns new tokens.
-static Token *tokenize(void) {
-    char *p = current_input;
-    Token head = {};
-    Token *cur = &head;
-    head.next = NULL;
+// Tokenize `user_input` and returns new tokens.
+Token *tokenize(void) {
+  char *p = user_input;
+  Token head = {};
+  Token *cur = &head;
 
-    while (*p) {
-        // pが空白ならスキップ
-        if (isspace(*p)) {
-            p++;
-            continue;
-        }
-
-        // 数値かどうか判定
-        if (isdigit(*p)) {
-            cur = new_token(TK_NUM, cur, p, 0);
-            char *q = p;
-            cur->val = strtol(p, &p, 10);
-            cur->len = p - q;
-            continue;
-        }
-
-        // '+' か '-'か判定
-        if (*p == '+' || *p == '-') {
-            cur = new_token(TK_RESERVED, cur, p, 1);
-            p++;
-            continue;
-        }
-
-        error_at(p, "invalid token");
+  while (*p) {
+    // Skip whitespace characters.
+    if (isspace(*p)) {
+      p++;
+      continue;
     }
 
-    cur = new_token(TK_EOF, cur, p, 0);
+    // Punctuator
+    if (*p == '+' || *p == '-') {
+      cur = new_token(TK_RESERVED, cur, p++);
+      continue;
+    }
 
-    return head.next;
+    // Integer literal
+    if (isdigit(*p)) {
+      cur = new_token(TK_NUM, cur, p);
+      cur->val = strtol(p, &p, 10);
+      continue;
+    }
 
+    error_at(p, "expected a number");
+  }
+
+  new_token(TK_EOF, cur, p);
+  return head.next;
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    fprintf(stderr, "%s: invalid number of arguments\n", argv[0]);
-    return 1;
-  }
+  if (argc != 2)
+    error("%s: invalid number of arguments", argv[0]);
 
-  current_input = argv[1];
-  Token *tok = tokenize();
+  user_input = argv[1];
+  token = tokenize();
 
-  printf(".globl main\n");
+  printf(".intel_syntax noprefix\n");
+  printf(".global main\n");
   printf("main:\n");
-  printf("  mov $%ld, %%rax\n", get_number(tok));
-  tok = tok->next;
 
-  while (tok->kind != TK_EOF) {
+  // The first token must be a number
+  printf("  mov rax, %ld\n", expect_number());
 
-      if (equal(tok, "+")) {
-          printf("  add $%ld, %%rax\n", get_number(tok->next));
-          tok = tok->next->next;
-          continue;
-      }
+  // ... followed by either `+ <number>` or `- <number>`.
+  while (!at_eof()) {
+    if (consume('+')) {
+      printf("  add rax, %ld\n", expect_number());
+      continue;
+    }
 
-      tok = skip(tok, "-");
-      printf("  sub $%ld, %%rax\n", get_number(tok));
-      tok = tok->next;
-
+    expect('-');
+    printf("  sub rax, %ld\n", expect_number());
   }
 
   printf("  ret\n");
