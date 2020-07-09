@@ -1,5 +1,7 @@
-*~
-*.o
+**/*~
+**/\#*
+**/*.o
+**/*.s
+**/a.out
 tmp*
-a.out
-chibicc
+tinycc
