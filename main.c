@@ -198,8 +198,13 @@ static Node *mul(void) {
     }
 }
 
-// primary = num
+// primary = "(" expr ")" | num
 static Node *primary(void) {
+    if (consume('(')) {
+        Node *node = expr();
+        expect(')');
+        return node;
+    }
     return new_num(expect_number());
 }
 
