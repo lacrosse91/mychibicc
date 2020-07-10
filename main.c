@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 //
 // Tokenizer
 //
@@ -23,6 +22,7 @@ struct Token {
   Token *next;    // Next token
   long val;       // If kind is TK_NUM, its value
   char *str;      // Token string
+  int len;        // Token length
 };
 
 // Input program
@@ -55,17 +55,19 @@ void error_at(char *loc, char *fmt, ...) {
 }
 
 // Consumes the current token if it matches `op`.
-bool consume(char op) {
-  if (token->kind != TK_RESERVED || token->str[0] != op)
+bool consume(char *op) {
+  if (token->kind != TK_RESERVED || strlen(op) != token->len ||
+      strncmp(token->str, op, token->len))
     return false;
   token = token->next;
   return true;
 }
 
 // Ensure that the current token is `op`.
-void expect(char op) {
-  if (token->kind != TK_RESERVED || token->str[0] != op)
-    error_at(token->str, "expected '%c'", op);
+void expect(char *op) {
+  if (token->kind != TK_RESERVED || strlen(op) != token->len ||
+      strncmp(token->str, op, token->len))
+    error_at(token->str, "expected \"%s\"", op);
   token = token->next;
 }
 
@@ -83,10 +85,11 @@ bool at_eof(void) {
 }
 
 // Create a new token and add it as the next token of `cur`.
-Token *new_token(TokenKind kind, Token *cur, char *str) {
+Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
   Token *tok = calloc(1, sizeof(Token));
   tok->kind = kind;
   tok->str = str;
+  tok->len = len;
   cur->next = tok;
   return tok;
 }
@@ -104,28 +107,30 @@ Token *tokenize(void) {
       continue;
     }
 
-    // Punctuator
+    // Single-letter punctuators
     if (ispunct(*p)) {
-      cur = new_token(TK_RESERVED, cur, p++);
+      cur = new_token(TK_RESERVED, cur, p++, 1);
       continue;
     }
 
     // Integer literal
     if (isdigit(*p)) {
-      cur = new_token(TK_NUM, cur, p);
+      cur = new_token(TK_NUM, cur, p, 0);
+      char *q = p;
       cur->val = strtol(p, &p, 10);
+      cur->len = p - q;
       continue;
     }
 
-    error_at(p, "expected a number");
+    error_at(p, "invalid token");
   }
 
-  new_token(TK_EOF, cur, p);
+  new_token(TK_EOF, cur, p, 0);
   return head.next;
 }
 
 //
-// parser
+// Parser
 //
 
 typedef enum {
@@ -146,17 +151,16 @@ struct Node {
 };
 
 static Node *new_node(NodeKind kind) {
-    Node *node = calloc(1, sizeof(Node));
-    node->kind = kind;
-    return node;
+  Node *node = calloc(1, sizeof(Node));
+  node->kind = kind;
+  return node;
 }
 
 static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
-    Node *node = calloc(1, sizeof(Node));
-    node->kind = kind;
-    node->lhs = lhs;
-    node->rhs = rhs;
-    return node;
+  Node *node = new_node(kind);
+  node->lhs = lhs;
+  node->rhs = rhs;
+  return node;
 }
 
 static Node *new_num(int val) {
@@ -170,92 +174,93 @@ static Node *mul(void);
 static Node *unary(void);
 static Node *primary(void);
 
-
 // expr = mul ("+" mul | "-" mul)*
 static Node *expr(void) {
-    Node *node = mul();
+  Node *node = mul();
 
-    for(;;) {
-        if (consume('+'))
-            node = new_binary(ND_ADD, node, mul());
-        else if (consume('-'))
-            node = new_binary(ND_SUB, node, mul());
-        else
-            return node;
-    }
+  for (;;) {
+    if (consume("+"))
+      node = new_binary(ND_ADD, node, mul());
+    else if (consume("-"))
+      node = new_binary(ND_SUB, node, mul());
+    else
+      return node;
+  }
 }
 
-// mul = unary ("*" unary | unary "/")*
+// mul = unary ("*" unary | "/" unary)*
 static Node *mul(void) {
-    Node *node = unary();
+  Node *node = unary();
 
-    for(;;) {
-        if (consume('*'))
-            node = new_binary(ND_MUL, node, unary());
-        else if (consume('/'))
-            node = new_binary(ND_DIV, node, unary());
-        else
-            return node;
-    }
+  for (;;) {
+    if (consume("*"))
+      node = new_binary(ND_MUL, node, unary());
+    else if (consume("/"))
+      node = new_binary(ND_DIV, node, unary());
+    else
+      return node;
+  }
 }
 
-// unary = ("+"| "-")? unary
+// unary = ("+" | "-")? unary
 //       | primary
 static Node *unary(void) {
-    if (consume('+'))
-        return unary();
-    if (consume('-'))
-        return new_binary(ND_SUB, new_num(0), unary());
-    return primary();
+  if (consume("+"))
+    return unary();
+  if (consume("-"))
+    return new_binary(ND_SUB, new_num(0), unary());
+  return primary();
 }
 
 // primary = "(" expr ")" | num
 static Node *primary(void) {
-    if (consume('(')) {
-        Node *node = expr();
-        expect(')');
-        return node;
-    }
-    return new_num(expect_number());
+  if (consume("(")) {
+    Node *node = expr();
+    expect(")");
+    return node;
+  }
+
+  return new_num(expect_number());
 }
 
+//
+// Code generator
+//
+
 static void gen(Node *node) {
-    switch (node->kind) {
-    case ND_NUM:
-        printf("  push %ld\n", node->val);
-        return;
-    }
+  if (node->kind == ND_NUM) {
+    printf("  push %ld\n", node->val);
+    return;
+  }
 
-    gen(node->lhs);
-    gen(node->rhs);
+  gen(node->lhs);
+  gen(node->rhs);
 
-    //スタックに積まれている値2つをポップ
-    printf("  pop rdi\n");
-    printf("  pop rax\n");
+  printf("  pop rdi\n");
+  printf("  pop rax\n");
 
+  switch (node->kind) {
+  case ND_ADD:
+    printf("  add rax, rdi\n");
+    break;
+  case ND_SUB:
+    printf("  sub rax, rdi\n");
+    break;
+  case ND_MUL:
+    printf("  imul rax, rdi\n");
+    break;
+  case ND_DIV:
+    printf("  cqo\n");
+    printf("  idiv rdi\n");
+    break;
+  }
 
-    switch (node->kind) {
-    case ND_ADD:
-        printf("  add rax, rdi\n");
-        break;
-    case ND_SUB:
-        printf("  sub rax, rdi\n");
-        break;
-    case ND_MUL:
-        printf("  imul rax, rdi\n");
-        break;
-    case ND_DIV:
-        printf("  cqo\n");
-        printf("  idiv rdi\n");
-        break;
-    }
-    printf("  push rax\n");
+  printf("  push rax\n");
 }
 
 int main(int argc, char **argv) {
   if (argc != 2)
     error("%s: invalid number of arguments", argv[0]);
-
 
   // Tokenize and parse.
   user_input = argv[1];
@@ -267,14 +272,12 @@ int main(int argc, char **argv) {
   printf(".global main\n");
   printf("main:\n");
 
-
-  // Tranverse the AST to emit assembly.
+  // Traverse the AST to emit assembly.
   gen(node);
 
   // A result must be at the top of the stack, so pop it
   // to RAX to make it a program exit code.
   printf("  pop rax\n");
-
   printf("  ret\n");
   return 0;
 }
