@@ -105,7 +105,7 @@ Token *tokenize(void) {
     }
 
     // Punctuator
-    if (*p == '+' || *p == '-') {
+    if (ispunct(*p)) {
       cur = new_token(TK_RESERVED, cur, p++);
       continue;
     }
@@ -131,6 +131,8 @@ Token *tokenize(void) {
 typedef enum {
   ND_ADD, // +
   ND_SUB, // -
+  ND_MUL, // *
+  ND_DIV, // /
   ND_NUM, // Integer
 } NodeKind;
 
@@ -165,6 +167,8 @@ static Node *new_num(int val) {
 
 static Node *expr(void);
 static Node *mul(void);
+static Node *primary(void);
+
 
 // expr = mul ("+" mul | "-" mul)
 static Node *expr(void) {
@@ -180,8 +184,22 @@ static Node *expr(void) {
     }
 }
 
-// mul = num
+// mul = primary ("*" primary | primary "/")
 static Node *mul(void) {
+    Node *node = primary();
+
+    for(;;) {
+        if (consume('*'))
+            node = new_binary(ND_MUL, node, primary());
+        else if (consume('/'))
+            node = new_binary(ND_DIV, node, primary());
+        else
+            return node;
+    }
+}
+
+// primary = num
+static Node *primary(void) {
     return new_num(expect_number());
 }
 
@@ -203,13 +221,19 @@ static void gen(Node *node) {
     switch (node->kind) {
     case ND_ADD:
         printf("  add rax, rdi\n");
-        printf("  push rax\n");
-        return;
+        break;
     case ND_SUB:
         printf("  sub rax, rdi\n");
-        printf("  push rax\n");
-        return;
+        break;
+    case ND_MUL:
+        printf("  imul rax, rdi\n");
+        break;
+    case ND_DIV:
+        printf("  cqo\n");
+        printf("  idiv rdi\n");
+        break;
     }
+    printf("  push rax\n");
 }
 
 int main(int argc, char **argv) {
