@@ -50,6 +50,7 @@ typedef enum {
   ND_LT,  // <
   ND_LE,  // <=
   ND_NUM, // Integer
+  ND_RETURN, // Return
 } NodeKind;
 
 // AST node type
