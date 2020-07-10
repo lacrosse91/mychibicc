@@ -51,6 +51,7 @@ typedef enum {
   ND_LE,  // <=
   ND_NUM, // Integer
   ND_RETURN, // Return
+  ND_EXPR_STMT, // Expression statement
 } NodeKind;
 
 // AST node type
