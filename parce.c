@@ -1,5 +1,17 @@
 #include "tiny.h"
 
+// All local variable instances created during parsing are
+// accumulated to this list.
+Var *locals;
+
+// Find a local variable by name.
+static Var *find_var(Token *tok) {
+  for (Var *var = locals; var; var = var->next)
+    if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
+      return var;
+  return NULL;
+}
+
 static Node *new_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
@@ -14,9 +26,9 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
 }
 
 static Node *new_unary(NodeKind kind, Node *expr) {
-    Node *node = new_node(kind);
-    node->lhs = expr;
-    return node;
+  Node *node = new_node(kind);
+  node->lhs = expr;
+  return node;
 }
 
 static Node *new_num(long val) {
@@ -25,10 +37,18 @@ static Node *new_num(long val) {
   return node;
 }
 
-static Node *new_var_node(char name) {
-    Node *node = new_node(ND_VAR);
-    node->name = name;
-    return node;
+static Node *new_var_node(Var *var) {
+  Node *node = new_node(ND_VAR);
+  node->var = var;
+  return node;
+}
+
+static Var *new_lvar(char *name) {
+  Var *var = calloc(1, sizeof(Var));
+  var->next = locals;
+  var->name = name;
+  locals = var;
+  return var;
 }
 
 static Node *stmt(void);
@@ -42,28 +62,35 @@ static Node *unary(void);
 static Node *primary(void);
 
 // program = stmt*
-Node *program(void) {
-    Node head = {};
-    Node *cur = &head;
+Function *program(void) {
+  locals = NULL;
 
-    while(!at_eof()) {
-        cur->next = stmt();
-        cur = cur->next;
-    }
+  Node head = {};
+  Node *cur = &head;
 
-    return head.next;
+  while (!at_eof()) {
+    cur->next = stmt();
+    cur = cur->next;
+  }
+
+  Function *prog = calloc(1, sizeof(Function));
+  prog->node = head.next;
+  prog->locals = locals;
+  return prog;
 }
 
-// stmt = "return" expr ";" | expr ";"
+// stmt = "return" expr ";"
+//      | expr ";"
 static Node *stmt(void) {
-    if (consume("return")) {
-        Node *node = new_unary(ND_RETURN, expr());
-        expect(";");
-        return node;
-    }
-    Node *node = new_unary(ND_EXPR_STMT, expr());
+  if (consume("return")) {
+    Node *node = new_unary(ND_RETURN, expr());
     expect(";");
     return node;
+  }
+
+  Node *node = new_unary(ND_EXPR_STMT, expr());
+  expect(";");
+  return node;
 }
 
 // expr = assign
@@ -73,12 +100,11 @@ static Node *expr(void) {
 
 // assign = equality ("=" assign)?
 static Node *assign(void) {
-    Node *node = equality();
-    if (consume("="))
-        node = new_binary(ND_ASSIGN, node, assign());
-    return node;
+  Node *node = equality();
+  if (consume("="))
+    node = new_binary(ND_ASSIGN, node, assign());
+  return node;
 }
-
 
 // equality = relational ("==" relational | "!=" relational)*
 static Node *equality(void) {
@@ -150,7 +176,7 @@ static Node *unary(void) {
   return primary();
 }
 
-// primary = "(" expr ")" | ident |num
+// primary = "(" expr ")" | ident | num
 static Node *primary(void) {
   if (consume("(")) {
     Node *node = expr();
@@ -159,9 +185,12 @@ static Node *primary(void) {
   }
 
   Token *tok = consume_ident();
-
-  if (tok)
-    return new_var_node(*tok->str);
+  if (tok) {
+    Var *var = find_var(tok);
+    if (!var)
+      var = new_lvar(strndup(tok->str, tok->len));
+    return new_var_node(var);
+  }
 
   return new_num(expect_number());
 }

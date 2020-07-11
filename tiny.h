@@ -1,3 +1,4 @@
+#define _GNI_SOURCE
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -9,6 +10,7 @@
 // tokenize.c
 //
 
+// Token
 typedef enum {
   TK_RESERVED, // Keywords or punctuators
   TK_NUM,      // Integer literals
@@ -42,6 +44,15 @@ extern Token *token;
 // parse.c
 //
 
+// Local variable
+typedef struct Var Var;
+struct Var {
+    Var *next;
+    char *name; // Variable name
+    int offset; // Offset from RBP
+};
+
+// AST node
 typedef enum {
   ND_ADD, // +
   ND_SUB, // -
@@ -66,14 +77,19 @@ struct Node {
   Node *next;
   Node *lhs;     // Left-hand side
   Node *rhs;     // Right-hand side
-  char name;
+  Var *var;
   long val;      // Used if kind == ND_NUM
 };
 
-Node *program(void);
+typedef struct Function Function;
+struct Function {
+    Node *node;
+    Var *locals;
+    int stack_size;
+};
 
 //
 // codegen.c
 //
 
-void codegen(Node *node);
+void codegen(Function *prog);

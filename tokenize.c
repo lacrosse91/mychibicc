@@ -102,15 +102,18 @@ Token *tokenize(void) {
 
     // Keywords
     if (startswith(p, "return") && !is_alnum(p[6])) {
-        cur = new_token(TK_RESERVED, cur, p, 6);
-        p += 6;
-        continue;
+      cur = new_token(TK_RESERVED, cur, p, 6);
+      p += 6;
+      continue;
     }
 
-    // Identifer
-    if ('a' <= *p && *p <= 'z') {
-        cur = new_token(TK_IDENT, cur, p++, 1);
-        continue;
+    // Identifier
+    if (is_alpha(*p)) {
+      char *q = p++;
+      while (is_alnum(*p))
+        p++;
+      cur = new_token(TK_IDENT, cur, q, p - q);
+      continue;
     }
 
     // Multi-letter punctuators
