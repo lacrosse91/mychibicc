@@ -1,4 +1,4 @@
-#define _GNI_SOURCE
+#define _GNU_SOURCE
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -13,9 +13,9 @@
 // Token
 typedef enum {
   TK_RESERVED, // Keywords or punctuators
+  TK_IDENT,    // Identifiers
   TK_NUM,      // Integer literals
   TK_EOF,      // End-of-file markers
-  TK_IDENT,    // Identifiers
 } TokenKind;
 
 // Token type
@@ -47,46 +47,55 @@ extern Token *token;
 // Local variable
 typedef struct Var Var;
 struct Var {
-    Var *next;
-    char *name; // Variable name
-    int offset; // Offset from RBP
+  Var *next;
+  char *name; // Variable name
+  int offset; // Offset from RBP
 };
 
 // AST node
 typedef enum {
-  ND_ADD, // +
-  ND_SUB, // -
-  ND_MUL, // *
-  ND_DIV, // /
-  ND_EQ,  // ==
-  ND_NE,  // !=
-  ND_LT,  // <
-  ND_LE,  // <=
-  ND_NUM, // Integer
-  ND_RETURN, // Return
+  ND_ADD,       // +
+  ND_SUB,       // -
+  ND_MUL,       // *
+  ND_DIV,       // /
+  ND_EQ,        // ==
+  ND_NE,        // !=
+  ND_LT,        // <
+  ND_LE,        // <=
+  ND_ASSIGN,    // =
+  ND_RETURN,    // "return"
+  ND_IF,        // "if"
   ND_EXPR_STMT, // Expression statement
-  ND_IDENT,  // Ident
-  ND_ASSIGN, // =
-  ND_VAR, // Variable
+  ND_VAR,       // Variable
+  ND_NUM,       // Integer
 } NodeKind;
 
 // AST node type
 typedef struct Node Node;
 struct Node {
   NodeKind kind; // Node kind
-  Node *next;
+  Node *next;    // Next node
+
   Node *lhs;     // Left-hand side
   Node *rhs;     // Right-hand side
-  Var *var;
+
+  // "if" statement
+  Node *cond;
+  Node *then;
+  Node *els;
+
+  Var *var;      // Used if kind == ND_VAR
   long val;      // Used if kind == ND_NUM
 };
 
 typedef struct Function Function;
 struct Function {
-    Node *node;
-    Var *locals;
-    int stack_size;
+  Node *node;
+  Var *locals;
+  int stack_size;
 };
+
+Function *program(void);
 
 //
 // codegen.c
