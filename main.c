@@ -14,6 +14,8 @@ int main(int argc, char **argv) {
     int offset = 0;
     for (VarList *vl = fn->locals; vl; vl = vl->next) {
       Var *var = vl->var;
+      if (var->ty->kind == TY_ARRAY)
+        printf("  # array offset is %d\n", var->ty->size);
       offset += var->ty->size;
       var->offset = offset;
     }
