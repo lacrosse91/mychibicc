@@ -1,6 +1,7 @@
 #include "tiny.h"
 
 static char *argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
 static int labelseq = 1;
 static char *funcname;
 
@@ -8,7 +9,6 @@ static void gen(Node *node);
 
 // Pushes the given node's address to the stack.
 static void gen_addr(Node *node) {
-
   switch (node->kind) {
   case ND_VAR:
     printf("  lea rax, [rbp-%d]\n", node->var->offset);
@@ -18,7 +18,6 @@ static void gen_addr(Node *node) {
     gen(node->lhs);
     return;
   }
-
 
   error_tok(node->tok, "not an lvalue");
 }
@@ -164,8 +163,22 @@ static void gen(Node *node) {
   case ND_ADD:
     printf("  add rax, rdi\n");
     break;
+  case ND_PTR_ADD:
+    printf("  imul rdi, 8\n");
+    printf("  add rax, rdi\n");
+    break;
   case ND_SUB:
     printf("  sub rax, rdi\n");
+    break;
+  case ND_PTR_SUB:
+    printf("  imul rdi, 8\n");
+    printf("  sub rax, rdi\n");
+    break;
+  case ND_PTR_DIFF:
+    printf("  sub rax, rdi\n");
+    printf("  cqo\n");
+    printf("  mov rdi, 8\n");
+    printf("  idiv rdi\n");
     break;
   case ND_MUL:
     printf("  imul rax, rdi\n");
@@ -201,6 +214,7 @@ static void gen(Node *node) {
 
 void codegen(Function *prog) {
   printf(".intel_syntax noprefix\n");
+
   for (Function *fn = prog; fn; fn = fn->next) {
     printf(".global %s\n", fn->name);
     printf("%s:\n", fn->name);
@@ -214,12 +228,9 @@ void codegen(Function *prog) {
     // Push arguments to the stack
     int i = 0;
     for (VarList *vl = fn->params; vl; vl = vl->next) {
-        Var *var = vl->var;
-        printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
+      Var *var = vl->var;
+      printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
     }
-
-
-
 
     // Emit code
     for (Node *node = fn->node; node; node = node->next)
