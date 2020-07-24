@@ -98,6 +98,7 @@ typedef enum {
   ND_BLOCK,     // {...}
   ND_EXPR_STMT, // Expression statement
   ND_VAR,       // Variable
+  ND_STMT_EXPR, // Statement expression
   ND_NUM,       // Integer
   ND_FUNCALL,   // Function call
   ND_NULL,      // Empty statement
@@ -128,7 +129,7 @@ struct Node {
   Var *var;      // Used if kind == ND_VAR
   long val;      // Used if kind == ND_NUM
 
-  // Block
+  // Block or statement expression
   Node *body;
 };
 
