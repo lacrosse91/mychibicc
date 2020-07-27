@@ -8,4 +8,11 @@ tinycc: $(OBJS)
 $(OBJS): tiny.h
 
 test: tinycc
-	./test.sh
+	./tinycc tests > tmp.s
+	gcc -static -o tmp tmp.s
+	./tmp
+
+clean:
+	rm -f tinycc *.o *~ tmp*
+
+.PHONY: test clean
