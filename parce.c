@@ -49,16 +49,16 @@ static Node *new_var_node(Var *var, Token *tok) {
 }
 
 static Var *new_var(char *name, Type *ty, bool is_local) {
-    Var *var = calloc(1, sizeof(Var));
-    var->name = name;
-    var->ty = ty;
-    var->is_local = is_local;
+  Var *var = calloc(1, sizeof(Var));
+  var->name = name;
+  var->ty = ty;
+  var->is_local = is_local;
 
-    VarList *sc = calloc(1, sizeof(VarList));
-    sc->var = var;
-    sc->next = scope;
-    scope = sc;
-    return var;
+  VarList *sc = calloc(1, sizeof(VarList));
+  sc->var = var;
+  sc->next = scope;
+  scope = sc;
+  return var;
 }
 
 static Var *new_lvar(char *name, Type *ty) {
@@ -82,16 +82,19 @@ static Var *new_gvar(char *name, Type *ty) {
 }
 
 static char *new_label(void) {
-    static int cnt = 0;
-    char buf[20];
-    sprintf(buf, ".L.data.%d", cnt++);
-    return strndup(buf, 20);
+  static int cnt = 0;
+  char buf[20];
+  sprintf(buf, ".L.data.%d", cnt++);
+  return strndup(buf, 20);
 }
 
 static Function *function(void);
 static Type *basetype(void);
+static Type *struct_decl(void);
+static Member *struct_member(void);
 static void global_var(void);
 static Node *declaration(void);
+static bool is_typename(void);
 static Node *stmt(void);
 static Node *stmt2(void);
 static Node *expr(void);
@@ -103,7 +106,6 @@ static Node *mul(void);
 static Node *unary(void);
 static Node *postfix(void);
 static Node *primary(void);
-
 
 // Determine whether the next top-level item is a function
 // or a global variable by looking ahead input tokens.
@@ -123,10 +125,10 @@ Program *program(void) {
 
   while (!at_eof()) {
     if (is_function()) {
-        cur->next = function();
-        cur = cur->next;
+      cur->next = function();
+      cur = cur->next;
     } else {
-        global_var();
+      global_var();
     }
   }
 
@@ -136,37 +138,83 @@ Program *program(void) {
   return prog;
 }
 
-// basetype = ( "char" | "int") "*"*
+// basetype = ("char" | "int" | struct-decl) "*"*
 static Type *basetype(void) {
+  if (!is_typename())
+    error_tok(token, "typename expected");
+
   Type *ty;
-  if (consume("char")) {
+  if (consume("char"))
     ty = char_type;
-  } else {
-    expect("int");
+  else if (consume("int"))
     ty = int_type;
-  }
+  else
+    ty = struct_decl();
+
   while (consume("*"))
     ty = pointer_to(ty);
   return ty;
 }
 
 static Type *read_type_suffix(Type *base) {
-    if (!consume("["))
-        return base;
-    int sz = expect_number();
-    expect("]");
-    base = read_type_suffix(base);
-    return array_of(base, sz);
+  if (!consume("["))
+    return base;
+  int sz = expect_number();
+  expect("]");
+  base = read_type_suffix(base);
+  return array_of(base, sz);
+}
+
+// struct-decl = "struct" "{" struct-member "}"
+static Type *struct_decl(void) {
+  // Read struct members.
+  expect("struct");
+  expect("{");
+
+  Member head = {};
+  Member *cur = &head;
+
+  while (!consume("}")) {
+    cur->next = struct_member();
+    cur = cur->next;
+  }
+
+  Type *ty = calloc(1, sizeof(Type));
+  ty->kind = TY_STRUCT;
+  ty->members = head.next;
+
+  // Assign offsets within the struct to members.
+  int offset = 0;
+  for (Member *mem = ty->members; mem; mem = mem->next) {
+    offset = align_to(offset, mem->ty->align);
+    mem->offset = offset;
+    offset += mem->ty->size;
+    if (ty->align < mem->ty->align)
+      ty->align = mem->ty->align;
+  }
+  ty->size = align_to(offset, ty->align);
+
+  return ty;
+}
+
+// struct-member = basetype ident ("[" num "]")* ";"
+static Member *struct_member(void) {
+  Member *mem = calloc(1, sizeof(Member));
+  mem->ty = basetype();
+  mem->name = expect_ident();
+  mem->ty = read_type_suffix(mem->ty);
+  expect(";");
+  return mem;
 }
 
 static VarList *read_func_param(void) {
-    Type *ty = basetype();
-    char *name = expect_ident();
-    ty = read_type_suffix(ty);
+  Type *ty = basetype();
+  char *name = expect_ident();
+  ty = read_type_suffix(ty);
 
-    VarList *vl = calloc(1, sizeof(VarList));
-    vl->var = new_lvar(name, ty);
-    return vl;
+  VarList *vl = calloc(1, sizeof(VarList));
+  vl->var = new_lvar(name, ty);
+  return vl;
 }
 
 static VarList *read_func_params(void) {
@@ -222,26 +270,24 @@ static void global_var(void) {
   new_gvar(name, ty);
 }
 
-
 // declaration = basetype ident ("[" num "]")* ("=" expr) ";"
 static Node *declaration(void) {
-    Token *tok = token;
-    Token *ty = basetype();
-    char *name = expect_ident();
-    ty = read_type_suffix(ty);
-    Var *var = new_lvar(name, ty);
+  Token *tok = token;
+  Type *ty = basetype();
+  char *name = expect_ident();
+  ty = read_type_suffix(ty);
+  Var *var = new_lvar(name, ty);
 
-    if (consume(";"))
-        return new_node(ND_NULL, tok);
+  if (consume(";"))
+    return new_node(ND_NULL, tok);
 
-    expect("=");
-    Node *lhs = new_var_node(var, tok);
-    Node *rhs = expr();
-    expect(";");
-    Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
-    return new_unary(ND_EXPR_STMT, node, tok);
+  expect("=");
+  Node *lhs = new_var_node(var, tok);
+  Node *rhs = expr();
+  expect(";");
+  Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
+  return new_unary(ND_EXPR_STMT, node, tok);
 }
-
 
 static Node *read_expr_stmt(void) {
   Token *tok = token;
@@ -250,7 +296,7 @@ static Node *read_expr_stmt(void) {
 
 // Returns true if the next token represents a type.
 static bool is_typename(void) {
-  return peek("char") || peek("int");
+  return peek("char") || peek("int") || peek("struct");
 }
 
 static Node *stmt(void) {
@@ -318,7 +364,6 @@ static Node *stmt2(void) {
     Node *cur = &head;
 
     VarList *sc = scope;
-
     while (!consume("}")) {
       cur->next = stmt();
       cur = cur->next;
@@ -457,18 +502,49 @@ static Node *unary(void) {
   return postfix();
 }
 
-// postfix = primary ( "[" expr "]")*
-static Node *postfix(void) {
-    Node *node = primary();
-    Token *tok;
+static Member *find_member(Type *ty, char *name) {
+  for (Member *mem = ty->members; mem; mem = mem->next)
+    if (!strcmp(mem->name, name))
+      return mem;
+  return NULL;
+}
 
-    while (tok = consume("[")) {
-        // X[y] is short for *(x+y)
-        Node *exp = new_add(node, expr(), tok);
-        expect("]");
-        node = new_unary(ND_DEREF, exp, tok);
+static Node *struct_ref(Node *lhs) {
+  add_type(lhs);
+  if (lhs->ty->kind != TY_STRUCT)
+    error_tok(lhs->tok, "not a struct");
+
+  Token *tok = token;
+  Member *mem = find_member(lhs->ty, expect_ident());
+  if (!mem)
+    error_tok(tok, "no such member");
+
+  Node *node = new_unary(ND_MEMBER, lhs, tok);
+  node->member = mem;
+  return node;
+}
+
+// postfix = primary ("[" expr "]" | "." ident)*
+static Node *postfix(void) {
+  Node *node = primary();
+  Token *tok;
+
+  for (;;) {
+    if (tok = consume("[")) {
+      // x[y] is short for *(x+y)
+      Node *exp = new_add(node, expr(), tok);
+      expect("]");
+      node = new_unary(ND_DEREF, exp, tok);
+      continue;
     }
+
+    if (tok = consume(".")) {
+      node = struct_ref(node);
+      continue;
+    }
+
     return node;
+  }
 }
 
 // stmt-expr = "(" "{" stmt stmt* "}" ")"
@@ -476,6 +552,7 @@ static Node *postfix(void) {
 // Statement expression is a GNU C extension.
 static Node *stmt_expr(Token *tok) {
   VarList *sc = scope;
+
   Node *node = new_node(ND_STMT_EXPR, tok);
   node->body = stmt();
   Node *cur = node->body;
@@ -485,6 +562,7 @@ static Node *stmt_expr(Token *tok) {
     cur = cur->next;
   }
   expect(")");
+
   scope = sc;
 
   if (cur->kind != ND_EXPR_STMT)
@@ -516,6 +594,7 @@ static Node *func_args(void) {
 //         | num
 static Node *primary(void) {
   Token *tok;
+
   if (tok = consume("(")) {
     if (consume("{"))
       return stmt_expr(tok);
@@ -548,16 +627,16 @@ static Node *primary(void) {
   }
 
   tok = token;
-
   if (tok->kind == TK_STR) {
-      token = token->next;
+    token = token->next;
 
-      Type *ty = array_of(char_type, tok->cont_len);
-      Var *var = new_gvar(new_label(), ty);
-      var->contents = tok->contents;
-      var->cont_len = tok->cont_len;
-      return new_var_node(var, tok);
+    Type *ty = array_of(char_type, tok->cont_len);
+    Var *var = new_gvar(new_label(), ty);
+    var->contents = tok->contents;
+    var->cont_len = tok->cont_len;
+    return new_var_node(var, tok);
   }
+
   if (tok->kind != TK_NUM)
     error_tok(tok, "expected expression");
   return new_num(expect_number(), tok);
