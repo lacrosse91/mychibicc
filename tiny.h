@@ -163,6 +163,8 @@ Program *program(void);
 typedef enum {
     TY_CHAR,
     TY_INT,
+    TY_SHORT,
+    TY_LONG,
     TY_PTR,
     TY_ARRAY,
     TY_STRUCT,
@@ -187,7 +189,9 @@ struct Member {
 
 
 extern Type *char_type;
+extern Type *short_type;
 extern Type *int_type;
+extern Type *long_type;
 bool is_integer(Type *ty);
 int align_to(int n, int align);
 Type *pointer_to(Type *base);
