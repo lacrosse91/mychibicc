@@ -13,12 +13,11 @@ void error(char *fmt, ...) {
   exit(1);
 }
 
-// Reports an error message in the following format and exit.
+// Reports an error message in the following format.
 //
 // foo.c:10: x = y + 1;
 //               ^ <error message here>
 static void verror_at(char *loc, char *fmt, va_list ap) {
-
   // Find a line containing `loc`.
   char *line = loc;
   while (user_input < line && line[-1] != '\n')
@@ -44,7 +43,6 @@ static void verror_at(char *loc, char *fmt, va_list ap) {
   fprintf(stderr, "^ ");
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
-  exit(1);
 }
 
 // Reports an error location and exit.
@@ -52,10 +50,18 @@ void error_at(char *loc, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(loc, fmt, ap);
+  exit(1);
 }
 
 // Reports an error location and exit.
 void error_tok(Token *tok, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(tok->str, fmt, ap);
+  exit(1);
+}
+
+void warn_tok(Token *tok, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(tok->str, fmt, ap);
@@ -73,10 +79,10 @@ Token *consume(char *op) {
 
 // Returns true if the current token matches a given string.
 Token *peek(char *s) {
-    if (token->kind != TK_RESERVED || strlen(s) != token->len ||
-        strncmp(token->str, s, token->len))
-        return NULL;
-    return token;
+  if (token->kind != TK_RESERVED || strlen(s) != token->len ||
+      strncmp(token->str, s, token->len))
+    return NULL;
+  return token;
 }
 
 // Consumes the current token if it is an identifier.
@@ -88,7 +94,7 @@ Token *consume_ident(void) {
   return t;
 }
 
-// Ensure that the current token is `op`.
+// Ensure that the current token is a given string
 void expect(char *s) {
   if (!peek(s))
     error_tok(token, "expected \"%s\"", s);
@@ -104,17 +110,17 @@ long expect_number(void) {
   return val;
 }
 
-bool at_eof(void) {
-  return token->kind == TK_EOF;
-}
-
 // Ensure that the current token is TK_IDENT.
 char *expect_ident(void) {
-    if (token->kind != TK_IDENT)
-        error_tok(token, "expected an identifier");
-    char *s = strndup(token->str, token->len);
-    token = token->next;
-    return s;
+  if (token->kind != TK_IDENT)
+    error_tok(token, "expected an identifier");
+  char *s = strndup(token->str, token->len);
+  token = token->next;
+  return s;
+}
+
+bool at_eof(void) {
+  return token->kind == TK_EOF;
 }
 
 // Create a new token and add it as the next token of `cur`.
@@ -140,25 +146,25 @@ static bool is_alnum(char c) {
 }
 
 static char *starts_with_reserved(char *p) {
-    // keyword
-    static char *kw[] = {"return", "if", "else", "while", "for", "int",
-                         "char", "sizeof", "struct", "typedef", "short",
-                         "long"};
+  // Keyword
+  static char *kw[] = {"return", "if", "else", "while", "for", "int",
+                       "char", "sizeof", "struct", "typedef", "short",
+                       "long"};
 
-    for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
-        int len = strlen(kw[i]);
-        if (startswith(p, kw[i]) && !is_alnum(p[len]))
-            return kw[i];
-    }
+  for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
+    int len = strlen(kw[i]);
+    if (startswith(p, kw[i]) && !is_alnum(p[len]))
+      return kw[i];
+  }
 
-    // Multi-letter punctuator
-    static char *ops[] = {"==", "!=", "<=", ">=", "->"};
+  // Multi-letter punctuator
+  static char *ops[] = {"==", "!=", "<=", ">=", "->"};
 
-    for (int i = 0; i < sizeof(ops) / sizeof(*ops); i++)
-        if (startswith(p, ops[i]))
-            return ops[i];
+  for (int i = 0; i < sizeof(ops) / sizeof(*ops); i++)
+    if (startswith(p, ops[i]))
+      return ops[i];
 
-    return NULL;
+  return NULL;
 }
 
 static char get_escape_char(char c) {
@@ -205,7 +211,6 @@ static Token *read_string_literal(Token *cur, char *start) {
   return tok;
 }
 
-
 // Tokenize `user_input` and returns new tokens.
 Token *tokenize(void) {
   char *p = user_input;
@@ -246,10 +251,10 @@ Token *tokenize(void) {
     // Keywords or multi-letter punctuators
     char *kw = starts_with_reserved(p);
     if (kw) {
-        int len = strlen(kw);
-        cur = new_token(TK_RESERVED, cur, p, len);
-        p += len;
-        continue;
+      int len = strlen(kw);
+      cur = new_token(TK_RESERVED, cur, p, len);
+      p += len;
+      continue;
     }
 
     // Identifier
@@ -260,7 +265,6 @@ Token *tokenize(void) {
       cur = new_token(TK_IDENT, cur, q, p - q);
       continue;
     }
-
 
     // Single-letter punctuators
     if (ispunct(*p)) {
