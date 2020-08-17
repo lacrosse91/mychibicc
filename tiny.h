@@ -163,6 +163,7 @@ Program *program(void);
 //
 typedef enum {
     TY_VOID,
+    TY_BOOL,
     TY_CHAR,
     TY_INT,
     TY_SHORT,
@@ -192,6 +193,7 @@ struct Member {
 };
 
 extern Type *void_type;
+extern Type *bool_type;
 extern Type *char_type;
 extern Type *short_type;
 extern Type *int_type;
