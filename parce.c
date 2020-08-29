@@ -653,7 +653,7 @@ static Node *stmt(void) {
 // stmt2 = "return" expr ";"
 //       | "if" "(" expr ")" stmt ("else" stmt)?
 //       | "while" "(" expr ")" stmt
-//       | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//       | "for" "(" (expr? ";" | declaration) expr? ";" expr? ")" stmt
 //       | "{" stmt* "}"
 //       | declaration
 //       | expr ";"
@@ -688,9 +688,14 @@ static Node *stmt2(void) {
   if (tok = consume("for")) {
     Node *node = new_node(ND_FOR, tok);
     expect("(");
+    Scope *sc = enter_scope();
     if (!consume(";")) {
-      node->init = read_expr_stmt();
-      expect(";");
+      if (is_typename()) {
+        node->init = declaration();
+      } else {
+        node->init = read_expr_stmt();
+        expect(";");
+      }
     }
     if (!consume(";")) {
       node->cond = expr();
@@ -701,6 +706,7 @@ static Node *stmt2(void) {
       expect(")");
     }
     node->then = stmt();
+    leave_scope(sc);
     return node;
   }
 
