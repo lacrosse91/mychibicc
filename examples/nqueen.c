@@ -9,10 +9,10 @@ int print_board(int (*board)[10]) {
   for (int i = 0; i < 10; i=i+1) {
     for (int j = 0; j < 10; j=j+1)
       if (board[i][j])
-	printf("Q ");
+        printf("Q ");
       else
-	printf(". ");
-    printf("\n");
+        printf(". ");
+      printf("\n");
   }
   printf("\n\n");
 }
