@@ -90,6 +90,9 @@ typedef enum {
   ND_PTR_DIFF,  // ptr - ptr
   ND_MUL,       // *
   ND_DIV,       // /
+  ND_BITAND,    // &
+  ND_BITOR,     // |
+  ND_BITXOR,    // ^
   ND_EQ,        // ==
   ND_NE,        // !=
   ND_LT,        // <
@@ -111,7 +114,7 @@ typedef enum {
   ND_ADDR,      // unary &
   ND_DEREF,     // unary *
   ND_NOT,       // !
-  ND_BITNOT,     // ~
+  ND_BITNOT,    // ~
   ND_RETURN,    // "return"
   ND_IF,        // "if"
   ND_WHILE,     // "while"
