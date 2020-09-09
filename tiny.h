@@ -123,6 +123,8 @@ typedef enum {
   ND_FOR,       // "FOR"
   ND_BREAK,     // "break"
   ND_CONTINUE,  // "continue"
+  ND_GOTO,      // "goto"
+  ND_LABEL,     // Labeled statement
   ND_BLOCK,     // {...}
   ND_EXPR_STMT, // Expression statement
   ND_VAR,       // Variable
@@ -159,6 +161,9 @@ struct Node {
 
   Var *var;      // Used if kind == ND_VAR
   long val;      // Used if kind == ND_NUM
+
+  // Goto or labeled statement
+  char *label_name;
 
   // Block or statement expression
   Node *body;
