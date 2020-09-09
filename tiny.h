@@ -202,6 +202,7 @@ struct Type {
     TypeKind kind;
     int size;        // sizeof() value
     int align;
+    bool is_incomplete; // incomplete type
     Type *base;
     int array_len;   // if kind == TY_ARRAY, use its value.
     Member *members; // struct
@@ -212,6 +213,7 @@ struct Type {
 struct Member {
     Member *next;
     Type *ty;
+    Token *tok; // for error message
     char *name;
     int offset;
 };
