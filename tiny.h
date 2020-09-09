@@ -122,6 +122,7 @@ typedef enum {
   ND_WHILE,     // "while"
   ND_FOR,       // "FOR"
   ND_BREAK,     // "break"
+  ND_CONTINUE,  // "continue"
   ND_BLOCK,     // {...}
   ND_EXPR_STMT, // Expression statement
   ND_VAR,       // Variable
