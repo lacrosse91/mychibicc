@@ -121,6 +121,8 @@ typedef enum {
   ND_IF,        // "if"
   ND_WHILE,     // "while"
   ND_FOR,       // "FOR"
+  ND_SWITCH,    // "switch"
+  ND_CASE,      // "case"
   ND_BREAK,     // "break"
   ND_CONTINUE,  // "continue"
   ND_GOTO,      // "goto"
@@ -159,7 +161,15 @@ struct Node {
   // Struct member access
   Member *member;
 
+  // Switch-cases
+  Node *case_next;
+  Node *default_case;
+  int case_label;
+  int case_end_label;
+
+  // Variable
   Var *var;      // Used if kind == ND_VAR
+  // Integer literal
   long val;      // Used if kind == ND_NUM
 
   // Goto or labeled statement
