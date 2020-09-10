@@ -200,6 +200,7 @@ static Node *bitor(void);
 static Node *bitxor(void);
 static Node *equality(void);
 static Node *relational(void);
+static Node *shift(void);
 static Node *add(void);
 static Node *mul(void);
 static Node *cast(void);
@@ -886,7 +887,7 @@ static Node *expr(void) {
 }
 
 // assign    = logor (assign-op assign)?
-// assign-op = "=" | "+=" | "-=" | "*=" | "/="
+// assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "<<=" | ">>="
 static Node *assign(void) {
   Node *node = logor();
   Token *tok;
@@ -898,6 +899,12 @@ static Node *assign(void) {
 
   if (tok = consume("/="))
     return new_binary(ND_DIV_EQ, node, assign(), tok);
+
+  if (tok = consume("<<="))
+    return new_binary(ND_SHL_EQ, node, assign(), tok);
+
+  if (tok = consume(">>="))
+    return new_binary(ND_SHR_EQ, node, assign(), tok);
 
   if (tok = consume("+=")) {
     add_type(node);
@@ -979,20 +986,35 @@ static Node *equality(void) {
   }
 }
 
-// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+// relational = shift ("<" shift | "<=" shift | ">" shift | ">=" shift)*
 static Node *relational(void) {
-  Node *node = add();
+  Node *node = shift();
   Token *tok;
 
   for (;;) {
     if (tok = consume("<"))
-      node = new_binary(ND_LT, node, add(), tok);
+      node = new_binary(ND_LT, node, shift(), tok);
     else if (tok = consume("<="))
-      node = new_binary(ND_LE, node, add(), tok);
+      node = new_binary(ND_LE, node, shift(), tok);
     else if (tok = consume(">"))
-      node = new_binary(ND_LT, add(), node, tok);
+      node = new_binary(ND_LT, shift(), node, tok);
     else if (tok = consume(">="))
-      node = new_binary(ND_LE, add(), node, tok);
+      node = new_binary(ND_LE, shift(), node, tok);
+    else
+      return node;
+  }
+}
+
+// shift = add ("<<" add | ">>" add)*
+static Node *shift(void) {
+  Node *node = add();
+  Token *tok;
+
+  for (;;) {
+    if (tok = consume("<<"))
+      node = new_binary(ND_SHL, node, add(), tok);
+    else if (tok = consume(">>"))
+      node = new_binary(ND_SHR, node, add(), tok);
     else
       return node;
   }

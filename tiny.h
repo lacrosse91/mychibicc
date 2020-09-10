@@ -93,6 +93,8 @@ typedef enum {
   ND_BITAND,    // &
   ND_BITOR,     // |
   ND_BITXOR,    // ^
+  ND_SHL,       // <<
+  ND_SHR,       // >>
   ND_EQ,        // ==
   ND_NE,        // !=
   ND_LT,        // <
@@ -109,6 +111,8 @@ typedef enum {
   ND_PTR_SUB_EQ,// -=
   ND_MUL_EQ,    // *=
   ND_DIV_EQ,    // /=
+  ND_SHL_EQ,    // <<=
+  ND_SHR_EQ,    // >>=
   ND_CAST,      // cast
   ND_MEMBER,    // . (struct member access)
   ND_ADDR,      // unary &
