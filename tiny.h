@@ -97,6 +97,9 @@ typedef enum {
   ND_BITXOR,    // ^
   ND_SHL,       // <<
   ND_SHR,       // >>
+  ND_BITAND_EQ, // &=
+  ND_BITOR_EQ,  // |=
+  ND_BITXOR_EQ, // ^=
   ND_EQ,        // ==
   ND_NE,        // !=
   ND_LT,        // <
